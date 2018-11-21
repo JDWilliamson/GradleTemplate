@@ -1,0 +1,155 @@
+group '<TODO: GROUP NAME HERE>'
+
+// https://semver.org/
+def release   = 0
+def feature   = 1
+def patch     = 0
+def mainClass = "<TODO: MAIN CLASS HERE>"
+
+version "$release.$feature.$patch"
+
+apply plugin: 'java'
+apply plugin: 'idea'
+
+// Java target version
+sourceCompatibility = 11
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+sourceSets {
+    integration {
+        java {
+            compileClasspath += main.output + main.runtimeClasspath
+            runtimeClasspath += main.output + main.runtimeClasspath
+            srcDirs "$projectDir/src/integration/java"
+        }
+    }
+    acceptance {
+        java {
+            compileClasspath += main.output + main.runtimeClasspath
+            runtimeClasspath += main.output + main.runtimeClasspath
+            srcDir "$projectDir/src/acceptance/java"
+        }
+    }
+}
+
+idea {
+    module {
+        sourceDirs += file('$projectDir/src/main/java')
+        sourceDirs -= file('$projectDir/src/integration/java')
+        sourceDirs -= file('$projectDir/src/integration/resources')
+        sourceDirs -= file('$projectDir/src/acceptance/java')
+        sourceDirs -= file('$projectDir/src/acceptance/resources')
+        testSourceDirs += project.sourceSets.integration.java.srcDirs
+        testSourceDirs += project.sourceSets.integration.resources.srcDirs
+        testSourceDirs += project.sourceSets.acceptance.java.srcDirs
+        testSourceDirs += project.sourceSets.acceptance.resources.srcDirs
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+            'Main-Class': "$group.$mainClass",
+            'Manifest-Version': '1.0'
+        )
+    }
+    from {
+        configurations.runtime.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+
+configurations {
+    runtime
+    integrationCompile
+    acceptanceCompile
+}
+
+dependencies {
+    // Sqlite
+    compile "org.xerial:sqlite-jdbc:3.21.0.1"
+
+    // Jackson Json
+    compile "com.fasterxml.jackson.core:jackson-core:2.4.1"
+    compile "com.fasterxml.jackson.core:jackson-annotations:2.4.1"
+    compile "com.fasterxml.jackson.core:jackson-databind:2.4.1"
+
+    // Mockito 2
+    testCompile "org.mockito:mockito-core:2.23.0"
+
+    // JUnit 5 (With JUnit 4 Compatibility)
+    testCompile "org.junit.platform:junit-platform-commons:1.1.0"
+    testCompile "org.junit.platform:junit-platform-console:1.1.0"
+    testCompile "org.junit.platform:junit-platform-engine:1.1.0"
+    testCompile "org.junit.platform:junit-platform-launcher:1.1.0"
+    testCompile "org.junit.platform:junit-platform-runner:1.1.0"
+    testCompile "org.junit.platform:junit-platform-suite-api:1.1.0"
+    testCompile "org.junit.platform:junit-platform-surefire-provider:1.1.0"
+    testCompile "org.junit.jupiter:junit-jupiter-api:5.1.0"
+    testCompile "org.junit.jupiter:junit-jupiter-engine:5.1.0"
+    testCompile "org.junit.jupiter:junit-jupiter-migrationsupport:5.1.0"
+    testCompile "org.junit.jupiter:junit-jupiter-params:5.1.0"
+    testCompile "org.junit.vintage:junit-vintage-engine:5.1.0"
+
+    // Setup configurations
+    configurations.runtime.extendsFrom(configurations.compile)
+    configurations.integrationCompile.extendsFrom(configurations.testCompile)
+    configurations.acceptanceCompile.extendsFrom(configurations.integrationCompile)
+}
+
+test {
+    // Enable JUnit 5 (Gradle 4.6+).
+    useJUnitPlatform()
+
+    // Always run tests, even when nothing changed.
+    dependsOn 'cleanTest'
+
+    // Show test results.
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
+allprojects {
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile) {
+            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+        }
+    }
+}
+
+check {
+    dependsOn 'integration'
+    dependsOn 'acceptance'
+}
+
+task integration(type:Test) {
+    useJUnitPlatform()
+    dependsOn('cleanIntegration')
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    group = "verification"
+    description = "Runs integration tests (located in src/integration/...)."
+    testClassesDirs = sourceSets.integration.output.classesDirs
+    classpath += sourceSets.integration.runtimeClasspath
+}
+
+task acceptance(type:Test) {
+    useJUnitPlatform()
+    dependsOn('cleanAcceptance')
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+    group "verification"
+    description = "Runs acceptance tests (located in src/acceptance/...)."
+    testClassesDirs += sourceSets.acceptance.output.classesDirs
+    classpath += sourceSets.acceptance.runtimeClasspath
+}
+
+build.dependsOn('test', 'integration', 'acceptance')
