@@ -1,15 +1,17 @@
-group '<TODO: GROUP NAME HERE>'
+plugins {
+    id 'java'
+    id 'idea'
+}
+
+group 'group'
 
 // https://semver.org/
 def release   = 0
 def feature   = 1
 def patch     = 0
-def mainClass = "<TODO: MAIN CLASS HERE>"
+def mainClass = "main"
 
-version "$release.$feature.$patch"
-
-apply plugin: 'java'
-apply plugin: 'idea'
+version "$release.$feature.$patch".toString()
 
 // Java target version
 sourceCompatibility = 11
@@ -21,28 +23,34 @@ repositories {
 
 sourceSets {
     integration {
+        compileClasspath += main.output + main.runtimeClasspath
+        runtimeClasspath += main.output + main.runtimeClasspath
         java {
-            compileClasspath += main.output + main.runtimeClasspath
-            runtimeClasspath += main.output + main.runtimeClasspath
-            srcDirs "$projectDir/src/integration/java"
+            srcDir "$projectDir/src/integration/java".toString()
+        }
+        resources {
+            srcDir "$projectDir/src/integration/resources".toString()
         }
     }
     acceptance {
+        compileClasspath += main.output + main.runtimeClasspath
+        runtimeClasspath += main.output + main.runtimeClasspath
         java {
-            compileClasspath += main.output + main.runtimeClasspath
-            runtimeClasspath += main.output + main.runtimeClasspath
-            srcDir "$projectDir/src/acceptance/java"
+            srcDir "$projectDir/src/acceptance/java".toString()
+        }
+        resources {
+            srcDir "$projectDir/src/acceptance/resources".toString()
         }
     }
 }
 
 idea {
     module {
-        sourceDirs += file('$projectDir/src/main/java')
-        sourceDirs -= file('$projectDir/src/integration/java')
-        sourceDirs -= file('$projectDir/src/integration/resources')
-        sourceDirs -= file('$projectDir/src/acceptance/java')
-        sourceDirs -= file('$projectDir/src/acceptance/resources')
+        sourceDirs += file("$projectDir/src/main/java")
+        sourceDirs -= file("$projectDir/src/integration/java")
+        sourceDirs -= file("$projectDir/src/integration/resources")
+        sourceDirs -= file("$projectDir/src/acceptance/java")
+        sourceDirs -= file("$projectDir/src/acceptance/resources")
         testSourceDirs += project.sourceSets.integration.java.srcDirs
         testSourceDirs += project.sourceSets.integration.resources.srcDirs
         testSourceDirs += project.sourceSets.acceptance.java.srcDirs
@@ -65,41 +73,36 @@ jar {
 }
 
 configurations {
-    runtime
-    integrationCompile
-    acceptanceCompile
+    runtime.extendsFrom(configurations.implementation)
+    integrationImplementation.extendsFrom(configurations.testImplementation)
+    acceptanceImplementation.extendsFrom(configurations.integrationImplementation)
 }
 
 dependencies {
     // Sqlite
-    compile "org.xerial:sqlite-jdbc:3.21.0.1"
+    implementation "org.xerial:sqlite-jdbc:3.21.0.1"
 
     // Jackson Json
-    compile "com.fasterxml.jackson.core:jackson-core:2.4.1"
-    compile "com.fasterxml.jackson.core:jackson-annotations:2.4.1"
-    compile "com.fasterxml.jackson.core:jackson-databind:2.4.1"
+    implementation "com.fasterxml.jackson.core:jackson-core:2.4.1"
+    implementation "com.fasterxml.jackson.core:jackson-annotations:2.4.1"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.4.1"
 
     // Mockito 2
-    testCompile "org.mockito:mockito-core:2.23.0"
+    testImplementation "org.mockito:mockito-core:2.23.0"
 
     // JUnit 5 (With JUnit 4 Compatibility)
-    testCompile "org.junit.platform:junit-platform-commons:1.1.0"
-    testCompile "org.junit.platform:junit-platform-console:1.1.0"
-    testCompile "org.junit.platform:junit-platform-engine:1.1.0"
-    testCompile "org.junit.platform:junit-platform-launcher:1.1.0"
-    testCompile "org.junit.platform:junit-platform-runner:1.1.0"
-    testCompile "org.junit.platform:junit-platform-suite-api:1.1.0"
-    testCompile "org.junit.platform:junit-platform-surefire-provider:1.1.0"
-    testCompile "org.junit.jupiter:junit-jupiter-api:5.1.0"
-    testCompile "org.junit.jupiter:junit-jupiter-engine:5.1.0"
-    testCompile "org.junit.jupiter:junit-jupiter-migrationsupport:5.1.0"
-    testCompile "org.junit.jupiter:junit-jupiter-params:5.1.0"
-    testCompile "org.junit.vintage:junit-vintage-engine:5.1.0"
-
-    // Setup configurations
-    configurations.runtime.extendsFrom(configurations.compile)
-    configurations.integrationCompile.extendsFrom(configurations.testCompile)
-    configurations.acceptanceCompile.extendsFrom(configurations.integrationCompile)
+    testImplementation "org.junit.platform:junit-platform-commons:1.1.0"
+    testImplementation "org.junit.platform:junit-platform-console:1.1.0"
+    testImplementation "org.junit.platform:junit-platform-engine:1.1.0"
+    testImplementation "org.junit.platform:junit-platform-launcher:1.1.0"
+    testImplementation "org.junit.platform:junit-platform-runner:1.1.0"
+    testImplementation "org.junit.platform:junit-platform-suite-api:1.1.0"
+    testImplementation "org.junit.platform:junit-platform-surefire-provider:1.1.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.1.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:5.1.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-migrationsupport:5.1.0"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:5.1.0"
+    testImplementation "org.junit.vintage:junit-vintage-engine:5.1.0"
 }
 
 test {
@@ -121,11 +124,6 @@ allprojects {
             options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
         }
     }
-}
-
-check {
-    dependsOn 'integration'
-    dependsOn 'acceptance'
 }
 
 task integration(type:Test) {
@@ -152,4 +150,12 @@ task acceptance(type:Test) {
     classpath += sourceSets.acceptance.runtimeClasspath
 }
 
-build.dependsOn('test', 'integration', 'acceptance')
+check {
+    dependsOn 'test'
+    dependsOn 'integration'
+    dependsOn 'acceptance'
+}
+
+build {
+    dependsOn 'check'
+}
