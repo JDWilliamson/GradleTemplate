@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'idea'
+    id 'maven-publish'
 }
 
 group 'group'
@@ -14,7 +15,8 @@ def mainClass = "main"
 version "$release.$feature.$patch".toString()
 
 // Java target version
-sourceCompatibility = 11
+sourceCompatibility = 12
+targetCompatibility = 12
 
 repositories {
     mavenCentral()
@@ -66,16 +68,10 @@ jar {
         )
     }
     from {
-        configurations.runtime.collect {
+        configurations.implementation.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
-}
-
-configurations {
-    runtime.extendsFrom(configurations.implementation)
-    integrationImplementation.extendsFrom(configurations.testImplementation)
-    acceptanceImplementation.extendsFrom(configurations.integrationImplementation)
 }
 
 dependencies {
@@ -90,67 +86,28 @@ dependencies {
     // Mockito 2
     testImplementation "org.mockito:mockito-core:2.23.0"
 
-    // JUnit 5 (With JUnit 4 Compatibility)
-    testImplementation "org.junit.platform:junit-platform-commons:1.1.0"
-    testImplementation "org.junit.platform:junit-platform-console:1.1.0"
-    testImplementation "org.junit.platform:junit-platform-engine:1.1.0"
-    testImplementation "org.junit.platform:junit-platform-launcher:1.1.0"
-    testImplementation "org.junit.platform:junit-platform-runner:1.1.0"
-    testImplementation "org.junit.platform:junit-platform-suite-api:1.1.0"
-    testImplementation "org.junit.platform:junit-platform-surefire-provider:1.1.0"
-    testImplementation "org.junit.jupiter:junit-jupiter-api:5.1.0"
-    testImplementation "org.junit.jupiter:junit-jupiter-engine:5.1.0"
-    testImplementation "org.junit.jupiter:junit-jupiter-migrationsupport:5.1.0"
-    testImplementation "org.junit.jupiter:junit-jupiter-params:5.1.0"
-    testImplementation "org.junit.vintage:junit-vintage-engine:5.1.0"
-}
-
-test {
-    // Enable JUnit 5 (Gradle 4.6+).
-    useJUnitPlatform()
-
-    // Always run tests, even when nothing changed.
-    dependsOn 'cleanTest'
-
-    // Show test results.
-    testLogging {
-        events "passed", "skipped", "failed"
-    }
+    // JUnit 5
+    testImplementation "org.junit.jupiter:junit-jupiter:5.5.1"
 }
 
 allprojects {
     gradle.projectsEvaluated {
         tasks.withType(JavaCompile) {
-            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation" << "--enable-preview"
         }
     }
 }
 
-task integration(type:Test) {
-    useJUnitPlatform()
-    dependsOn('cleanIntegration')
-    testLogging {
-        events "passed", "skipped", "failed"
-    }
-    group = "verification"
-    description = "Runs integration tests (located in src/integration/...)."
-    testClassesDirs = sourceSets.integration.output.classesDirs
-    classpath += sourceSets.integration.runtimeClasspath
-}
+task integration(type:Test)
+task acceptance(type:Test)
 
-task acceptance(type:Test) {
-    useJUnitPlatform()
-    dependsOn('cleanAcceptance')
-    testLogging {
-        events "passed", "skipped", "failed"
-    }
-    group "verification"
-    description = "Runs acceptance tests (located in src/acceptance/...)."
-    testClassesDirs += sourceSets.acceptance.output.classesDirs
-    classpath += sourceSets.acceptance.runtimeClasspath
-}
+configureVerificationTask(test, "Runs unit tests (located in src/test/...).")
+configureVerificationTask(integration, "Runs integration tests (located in src/integration/...).")
+configureVerificationTask(acceptance, "Runs acceptance tests (located in src/acceptance/...).")
 
 check {
+    acceptance.mustRunAfter 'integration'
+    integration.mustRunAfter 'test'
     dependsOn 'test'
     dependsOn 'integration'
     dependsOn 'acceptance'
@@ -158,4 +115,30 @@ check {
 
 build {
     dependsOn 'check'
+}
+
+
+def configureVerificationTask(Task task, desc) {
+    task.configure {
+        useJUnitPlatform() // Enable JUnit 5
+        cleanTask task // Always run tests, even when nothing changed.
+        testLogging { // Show test results
+            events "passed", "skipped", "failed"
+            showStandardStreams = true
+        }
+        group "verification"
+        description desc
+        testClassesDirs = sourceSets.findByName(name).output.classesDirs
+        classpath = sourceSets.findByName(name).runtimeClasspath
+    }
+}
+
+static def cleanTask(Task task) {
+    task.configure {
+        dependsOn "clean${capitalize(name)}"
+    }
+}
+
+static def capitalize(String word) {
+    return "${Character.toTitleCase(word.charAt(0))}${word.substring(1)}"
 }
