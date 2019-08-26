@@ -68,10 +68,14 @@ jar {
         )
     }
     from {
-        configurations.implementation.collect {
+        configurations.runtime.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
+}
+
+configurations {
+    runtime.extendsFrom(implementation)
 }
 
 dependencies {
