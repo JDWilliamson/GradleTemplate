@@ -76,6 +76,8 @@ jar {
 
 configurations {
     runtime.extendsFrom(implementation)
+    integrationImplementation.extendsFrom(testImplementation)
+    acceptanceImplementation.extendsFrom(integrationImplementation)
 }
 
 dependencies {
@@ -97,7 +99,7 @@ dependencies {
 allprojects {
     gradle.projectsEvaluated {
         tasks.withType(JavaCompile) {
-            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation" << "--enable-preview"
+            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"// << "--enable-preview"
         }
     }
 }
